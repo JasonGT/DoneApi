@@ -43,27 +43,24 @@ namespace DoneApi.UnitTests.Controllers
         [Fact]
         public async Task GetAll_ReturnsItems()
         {
+            // Arrange
             var controller = new ItemsController(_context);
 
+            // Act
             var result = await controller.GetAll();
 
+            // Assert
             var model = Assert.IsAssignableFrom<IEnumerable<Item>>(result);
-
-            var expectedCount = 10;
-
-            Assert.Equal(expectedCount, model.Count());
+            Assert.Equal(10, model.Count());
         }
 
         [Fact]
         public async Task GetById_ReturnsNotFound_GivenInvalidId()
         {
-            // Arrange
             var controller = new ItemsController(_context);
 
-            // Act
             var result = await controller.GetById(99);
 
-            // Assert
             Assert.IsType<NotFoundResult>(result);
         }
 
@@ -72,15 +69,11 @@ namespace DoneApi.UnitTests.Controllers
         {
             var controller = new ItemsController(_context);
 
-            string expectedName = "Item 2";
-
             var result = await controller.GetById(2);
 
             var objectResult = Assert.IsType<ObjectResult>(result);
-
             var task = Assert.IsAssignableFrom<Item>(objectResult.Value);
-
-            Assert.Equal(expectedName, task.Description);
+            Assert.Equal("Item 2", task.Description);
         }
 
         [Fact]
@@ -97,7 +90,6 @@ namespace DoneApi.UnitTests.Controllers
         public async Task Create_ReturnsBadRequest_WhenModelStateIsInvalid()
         {
             var controller = new ItemsController(_context);
-
             controller.ModelState.AddModelError("Name", "Required");
 
             var result = await controller.Create(new Item());
@@ -139,7 +131,6 @@ namespace DoneApi.UnitTests.Controllers
         public async Task Update_ReturnsBadRequest_WhenModelStateIsInvalid()
         {
             var controller = new ItemsController(_context);
-
             controller.ModelState.AddModelError("Name", "Required");
 
             var result = await controller.Update(1, new Item { Id = 1, Description = null });
