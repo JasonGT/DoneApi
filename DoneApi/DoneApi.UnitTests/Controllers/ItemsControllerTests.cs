@@ -15,34 +15,37 @@ namespace DoneApi.UnitTests.Controllers
     public class ItemsControllerTests : IDisposable
     {
         private readonly DoneDbContext _context;
-        private readonly ItemsController _controller;
 
         public ItemsControllerTests()
         {
+            // By supplying a new service provider for each context, 
+            // we have a single database instance per test.
             var serviceProvider = new ServiceCollection()
                .AddEntityFrameworkInMemoryDatabase()
                .BuildServiceProvider();
-
+            
+            // Build context options
             var builder = new DbContextOptionsBuilder<DoneDbContext>()
-                .UseInMemoryDatabase()
+                .UseInMemoryDatabase() // Use InMemory database
                 .UseInternalServiceProvider(serviceProvider);
 
-            var context = new DoneDbContext(builder.Options);
-            context.Database.EnsureCreated();
+            // Instantiate the context
+            _context = new DoneDbContext(builder.Options);
 
-            var tasks = Enumerable.Range(1, 10).Select(t => new Item { Description = "Item " + t });
+            // Seed the database
+            _context.Items.AddRange(
+                Enumerable.Range(1, 10).Select(t => new Item { Description = "Item " + t })
+            );
 
-            context.Items.AddRange(tasks);
-            context.SaveChanges();
-
-            _context = context;
-            _controller = new ItemsController(_context);
+            _context.SaveChanges();
         }
 
         [Fact]
         public async Task GetAll_ReturnsItems()
         {
-            var result = await _controller.GetAll();
+            var controller = new ItemsController(_context);
+
+            var result = await controller.GetAll();
 
             var model = Assert.IsAssignableFrom<IEnumerable<Item>>(result);
 
@@ -54,17 +57,24 @@ namespace DoneApi.UnitTests.Controllers
         [Fact]
         public async Task GetById_ReturnsNotFound_GivenInvalidId()
         {
-            var result = await _controller.GetById(99);
+            // Arrange
+            var controller = new ItemsController(_context);
 
+            // Act
+            var result = await controller.GetById(99);
+
+            // Assert
             Assert.IsType<NotFoundResult>(result);
         }
 
         [Fact]
         public async Task GetById_ReturnsItem_GivenValidId()
         {
+            var controller = new ItemsController(_context);
+
             string expectedName = "Item 2";
 
-            var result = await _controller.GetById(2);
+            var result = await controller.GetById(2);
 
             var objectResult = Assert.IsType<ObjectResult>(result);
 
@@ -76,7 +86,9 @@ namespace DoneApi.UnitTests.Controllers
         [Fact]
         public async Task Create_ReturnsBadRequest_GivenNullItem()
         {
-            var result = await _controller.Create(null);
+            var controller = new ItemsController(_context);
+
+            var result = await controller.Create(null);
 
             Assert.IsType<BadRequestResult>(result);
         }
@@ -84,9 +96,11 @@ namespace DoneApi.UnitTests.Controllers
         [Fact]
         public async Task Create_ReturnsBadRequest_WhenModelStateIsInvalid()
         {
-            _controller.ModelState.AddModelError("Name", "Required");
+            var controller = new ItemsController(_context);
 
-            var result = await _controller.Create(new Item());
+            controller.ModelState.AddModelError("Name", "Required");
+
+            var result = await controller.Create(new Item());
 
             Assert.IsType<BadRequestObjectResult>(result);
         }
@@ -94,7 +108,9 @@ namespace DoneApi.UnitTests.Controllers
         [Fact]
         public async Task Create_ReturnsNewlyCreatedTodoItem()
         {
-            var result = await _controller.Create(new Item { Description = "This is a new task" });
+            var controller = new ItemsController(_context);
+
+            var result = await controller.Create(new Item { Description = "This is a new task" });
 
             Assert.IsType<CreatedAtRouteResult>(result);
         }
@@ -102,7 +118,9 @@ namespace DoneApi.UnitTests.Controllers
         [Fact]
         public async Task Update_ReturnsBadRequest_WhenIdIsInvalid()
         {
-            var result = await _controller.Update(99, new Item { Id = 1, Description = "Task 1" });
+            var controller = new ItemsController(_context);
+
+            var result = await controller.Update(99, new Item { Id = 1, Description = "Task 1" });
 
             Assert.IsType<BadRequestResult>(result);
         }
@@ -110,7 +128,9 @@ namespace DoneApi.UnitTests.Controllers
         [Fact]
         public async Task Update_ReturnsBadRequestWhenItemIsInvalid()
         {
-            var result = await _controller.Update(1, null);
+            var controller = new ItemsController(_context);
+
+            var result = await controller.Update(1, null);
 
             Assert.IsType<BadRequestResult>(result);
         }
@@ -118,9 +138,11 @@ namespace DoneApi.UnitTests.Controllers
         [Fact]
         public async Task Update_ReturnsBadRequest_WhenModelStateIsInvalid()
         {
-            _controller.ModelState.AddModelError("Name", "Required");
+            var controller = new ItemsController(_context);
 
-            var result = await _controller.Update(1, new Item { Id = 1, Description = null });
+            controller.ModelState.AddModelError("Name", "Required");
+
+            var result = await controller.Update(1, new Item { Id = 1, Description = null });
 
             Assert.IsType<BadRequestObjectResult>(result);
         }
@@ -128,7 +150,9 @@ namespace DoneApi.UnitTests.Controllers
         [Fact]
         public async Task Update_ReturnsNotFound_WhenIdIsInvalid()
         {
-            var result = await _controller.Update(99, new Item { Id = 99, Description = "Task 99" });
+            var controller = new ItemsController(_context);
+
+            var result = await controller.Update(99, new Item { Id = 99, Description = "Task 99" });
 
             Assert.IsType<NotFoundResult>(result);
         }
@@ -136,7 +160,9 @@ namespace DoneApi.UnitTests.Controllers
         [Fact]
         public async Task Update_ReturnsNoContent_WhenItemUpdated()
         {
-            var result = await _controller.Update(1, new Item { Id = 1, Description = "Task 1", Done = true });
+            var controller = new ItemsController(_context);
+
+            var result = await controller.Update(1, new Item { Id = 1, Description = "Task 1", Done = true });
 
             Assert.IsType<NoContentResult>(result);
         }
@@ -144,7 +170,9 @@ namespace DoneApi.UnitTests.Controllers
         [Fact]
         public async Task Delete_ReturnsNotFound_WhenIsIsInvalid()
         {
-            var result = await _controller.Delete(99);
+            var controller = new ItemsController(_context);
+
+            var result = await controller.Delete(99);
 
             Assert.IsType<NotFoundResult>(result);
         }
@@ -152,14 +180,15 @@ namespace DoneApi.UnitTests.Controllers
         [Fact]
         public async Task Delete_ReturnsNoContent_WhenItemDeleted()
         {
-            var result = await _controller.Delete(2);
+            var controller = new ItemsController(_context);
+
+            var result = await controller.Delete(2);
 
             Assert.IsType<NoContentResult>(result);
         }
 
         public void Dispose()
         {
-            _context.Database.EnsureDeleted();
             _context.Dispose();
         }
     }
